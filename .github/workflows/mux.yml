@@ -16,14 +16,21 @@ jobs:
   mux:
     runs-on: ubuntu-latest
     steps:
+      - name: Setup FFmpeg (static)
+        run: |
+          curl -sL https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz -o /tmp/ffmpeg.tar.xz
+          tar -xJf /tmp/ffmpeg.tar.xz -C /tmp
+          sudo install -m 755 /tmp/ffmpeg-*-amd64-static/ffmpeg /usr/local/bin/ffmpeg
+          ffmpeg -version | head -1
+
       - name: Merge 1080p Video and Audio
         env:
           VID_ID: ${{ inputs.vid_id }}
           VB64: ${{ inputs.vb64 }}
           AB64: ${{ inputs.ab64 }}
         run: |
-          V_URL=$(echo "$VB64" | tr '_-' '/+' | base64 -d)
-          A_URL=$(echo "$AB64" | tr '_-' '/+' | base64 -d)
+          V_URL=$(python3 -c "import base64,os; s=os.environ['VB64'].strip(); s += '=' * (-len(s) % 4); print(base64.urlsafe_b64decode(s).decode())")
+          A_URL=$(python3 -c "import base64,os; s=os.environ['AB64'].strip(); s += '=' * (-len(s) % 4); print(base64.urlsafe_b64decode(s).decode())")
           curl -sL -A "Mozilla/5.0" "$V_URL" -o v.mp4
           curl -sL -A "Mozilla/5.0" "$A_URL" -o a.m4a
           ffmpeg -y -i v.mp4 -i a.m4a -c copy -movflags +faststart "${VID_ID}.mp4"
