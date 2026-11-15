@@ -1,0 +1,37 @@
+name: Mux1080p
+on:
+  workflow_dispatch:
+    inputs:
+      vid_id:
+        required: true
+      vb64:
+        required: true
+      ab64:
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  mux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Merge 1080p Video and Audio
+        env:
+          VID_ID: ${{ inputs.vid_id }}
+          VB64: ${{ inputs.vb64 }}
+          AB64: ${{ inputs.ab64 }}
+        run: |
+          V_URL=$(echo "$VB64" | tr '_-' '/+' | base64 -d)
+          A_URL=$(echo "$AB64" | tr '_-' '/+' | base64 -d)
+          curl -sL -A "Mozilla/5.0" "$V_URL" -o v.mp4
+          curl -sL -A "Mozilla/5.0" "$A_URL" -o a.m4a
+          ffmpeg -y -i v.mp4 -i a.m4a -c copy -movflags +faststart "${VID_ID}.mp4"
+
+      - name: Upload to GitHub Releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VID_ID: ${{ inputs.vid_id }}
+        run: |
+          gh release view v1 --repo ${{ github.repository }} || gh release create v1 --title "Videos" --notes "Muxed" --repo ${{ github.repository }}
+          gh release upload v1 "${VID_ID}.mp4" --clobber --repo ${{ github.repository }}
