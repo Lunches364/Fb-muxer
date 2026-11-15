@@ -20,7 +20,7 @@ jobs:
         run: |
           curl -sL https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz -o /tmp/ffmpeg.tar.xz
           tar -xJf /tmp/ffmpeg.tar.xz -C /tmp
-          sudo install -m 755 /tmp/ffmpeg-*-amd64-static/ffmpeg /usr/local/bin/ffmpeg
+          sudo install -m 755 /tmp/ffmpeg-*-amd64-static/ffmpeg /tmp/ffmpeg-*-amd64-static/ffprobe /usr/local/bin/
           ffmpeg -version | head -1
 
       - name: Merge 1080p Video and Audio
@@ -33,7 +33,13 @@ jobs:
           A_URL=$(python3 -c "import base64,os; s=os.environ['AB64'].strip(); s += '=' * (-len(s) % 4); print(base64.urlsafe_b64decode(s).decode())")
           curl -sL -A "Mozilla/5.0" "$V_URL" -o v.mp4
           curl -sL -A "Mozilla/5.0" "$A_URL" -o a.m4a
-          ffmpeg -y -i v.mp4 -i a.m4a -c copy -movflags +faststart "${VID_ID}.mp4"
+          VCODEC=$(ffprobe -v error -select_streams v:0 -show_entries stream=codec_name -of csv=p=0 v.mp4)
+          echo "Source video codec: $VCODEC"
+          if [ "$VCODEC" = "h264" ]; then
+            ffmpeg -y -i v.mp4 -i a.m4a -c copy -movflags +faststart "${VID_ID}.mp4"
+          else
+            ffmpeg -y -i v.mp4 -i a.m4a -c:v libx264 -preset superfast -crf 18 -pix_fmt yuv420p -c:a copy -movflags +faststart "${VID_ID}.mp4"
+          fi
 
       - name: Upload to GitHub Releases
         env:
